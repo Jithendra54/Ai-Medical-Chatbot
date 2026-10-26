@@ -1,1 +1,15 @@
-render.yaml
+services:
+  - type: web
+    name: careguide-medical-chatbot
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn --workers 2 --threads 4 --timeout 60 --bind 0.0.0.0:$PORT app:app
+    healthCheckPath: /api/health
+    envVars:
+      - key: XAI_API_KEY
+        sync: false
+      - key: XAI_MODEL
+        value: grok-4.6
+      - key: RATE_LIMIT_PER_MINUTE
+        value: "20"
