@@ -19,7 +19,7 @@ class CareGuideTestCase(unittest.TestCase):
     def test_health_endpoint_has_mode(self):
         response = self.client.get('/api/health')
         self.assertEqual(response.status_code, 200)
-        self.assertIn(response.json['mode'], ('demo', 'grok'))
+        self.assertIn(response.json['mode'], ('demo', 'grok', 'ollama'))
 
     def test_rejects_missing_messages(self):
         response = self.client.post('/api/chat', json={})
@@ -42,7 +42,7 @@ class CareGuideTestCase(unittest.TestCase):
         self.assertIn('112', response.json['reply'])
 
     def test_demo_mode_returns_explicit_demo_reply(self):
-        with patch.dict(os.environ, {'XAI_API_KEY': ''}):
+        with patch.dict(os.environ, {'AI_PROVIDER': 'demo', 'XAI_API_KEY': ''}):
             response = self.client.post('/api/chat', json={
                 'messages': [{'role': 'user', 'content': 'What can help with a mild cold?'}]
             })
