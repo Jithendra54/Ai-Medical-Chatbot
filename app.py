@@ -1,8 +1,6 @@
 """CareGuide — AI Medical Chatbot prototype.
 
-A Flask app that keeps conversation state in the browser and calls xAI's API
-only from the server. If XAI_API_KEY is not configured, the app runs in a
-clearly labelled demo mode with canned examples and no external AI requests.
+A Flask app that keeps conversation state in the browser and uses a local Ollama model by default. Optional xAI mode is available only when explicitly selected.
 """
 
 from __future__ import annotations
@@ -24,7 +22,9 @@ app = Flask(__name__)
 app.config["MAX_CONTENT_LENGTH"] = 32 * 1024
 
 XAI_API_URL = "https://api.x.ai/v1/chat/completions"
+OLLAMA_API_URL = os.getenv("OLLAMA_API_URL", "http://127.0.0.1:11434/api/chat")
 DEFAULT_MODEL = os.getenv("XAI_MODEL", "grok-4.6")
+OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "qwen2.5:3b")
 MAX_MESSAGE_CHARS = 2_000
 MAX_HISTORY_MESSAGES = 12
 MAX_HISTORY_CHARS = 10_000
@@ -58,7 +58,12 @@ EMERGENCY_PATTERNS = [
 
 
 def current_mode() -> str:
-    return "grok" if os.getenv("XAI_API_KEY", "").strip() else "demo"
+    provider = os.getenv("AI_PROVIDER", "ollama").strip().lower()
+    if provider == "demo":
+        return "demo"
+    if provider == "xai":
+        return "grok" if os.getenv("XAI_API_KEY", "").strip() else "demo"
+    return "ollama"
 
 
 def is_possible_emergency(message: str) -> bool:
@@ -126,6 +131,23 @@ def normalise_history(raw_messages: Any) -> list[dict[str, str]]:
     if total_chars > MAX_HISTORY_CHARS:
         raise ValueError("Conversation is too long; please start a new chat")
     return cleaned
+
+
+def call_ollama(messages: list[dict[str, str]]) -> str:
+    """Call a model running locally through Ollama."""
+    payload = {
+        "model": os.getenv("OLLAMA_MODEL", OLLAMA_MODEL),
+        "messages": [{"role": "system", "content": SYSTEM_PROMPT}, *messages],
+        "stream": False,
+        "options": {"temperature": 0.2},
+    }
+    response = requests.post(OLLAMA_API_URL, json=payload, timeout=API_TIMEOUT_SECONDS)
+    response.raise_for_status()
+    data = response.json()
+    reply = data["message"]["content"]
+    if not isinstance(reply, str) or not reply.strip():
+        raise ValueError("The local AI model returned an empty response")
+    return reply.strip()
 
 
 def call_grok(messages: list[dict[str, str]]) -> str:
@@ -213,15 +235,20 @@ def chat():
     if mode == "demo":
         return jsonify({"reply": demo_reply(latest), "mode": "demo", "emergency": False})
     try:
-        reply = call_grok(messages)
-        return jsonify({"reply": reply, "mode": "grok", "emergency": False})
+        reply = call_grok(messages) if mode == "grok" else call_ollama(messages)
+        return jsonify({"reply": reply, "mode": mode, "emergency": False})
     except requests.Timeout:
-        return jsonify({"error": "The AI service took too long to respond. Please try again."}), 504
+        return jsonify({"error": "The AI model took too long to respond. Try again or use a smaller model."}), 504
+    except requests.ConnectionError:
+        if mode == "ollama":
+            return jsonify({"error": "Cannot reach Ollama. Install it, start it, and run ollama run qwen2.5:3b, then retry."}), 503
+        app.logger.warning("xAI API connection failed", exc_info=True)
+        return jsonify({"error": "The AI service is unavailable right now. Please try again later."}), 502
     except requests.RequestException:
-        app.logger.warning("xAI API request failed", exc_info=True)
+        app.logger.warning("AI provider request failed", exc_info=True)
         return jsonify({"error": "The AI service is unavailable right now. Please try again later."}), 502
     except (KeyError, IndexError, TypeError, ValueError):
-        app.logger.warning("Unexpected response from xAI API", exc_info=True)
+        app.logger.warning("Unexpected response from AI provider", exc_info=True)
         return jsonify({"error": "The AI service returned an unexpected response. Please try again."}), 502
 
 
