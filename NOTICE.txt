@@ -1,1 +1,1 @@
-NOTICE.txt
+CareGuide is an educational prototype for general health information. It is not a medical device and is not intended for diagnosis, treatment, or emergency triage. Emergency phrase screening is limited and must never be treated as a reliable determination of medical risk.
