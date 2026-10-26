@@ -1,11 +1,12 @@
 # CareGuide — AI Medical Chatbot
 
-CareGuide is a responsive web prototype based on the supplied **AI Chatbot (Medical Care)** synopsis. It uses a browser interface, Python/Flask backend, and xAI/Grok integration.
+CareGuide is a responsive web prototype based on the supplied **AI Chatbot (Medical Care)** synopsis. It uses a browser interface and Python/Flask backend. The default AI provider is a local Ollama model, so no paid API key is required.
 
 ## Features
 
 - Responsive medical chat interface for desktop and mobile.
-- Flask backend and xAI chat-completions integration; the API key stays server-side.
+- Local AI responses through Ollama by default; no paid API key or per-message API fee.
+- Optional xAI integration only if AI_PROVIDER=xai is deliberately configured.
 - Short-term chat context held in browser memory; no chat database or server-side transcript logging.
 - Clearly labelled demo mode if `XAI_API_KEY` is not configured.
 - Basic emergency phrase screening, medical disclaimer, India emergency number 112.
@@ -28,7 +29,7 @@ notepad .env
 python app.py
 ```
 
-Put your own xAI key after `XAI_API_KEY=` in `.env` to enable live Grok responses. Get a key at the [xAI Console](https://console.x.ai/). Leave it blank for demo mode. Open http://127.0.0.1:5000. Keep `.env` private; it is excluded from Git.
+Install [Ollama](https://ollama.com/download) for Windows. Then run `ollama run qwen2.5:3b` in PowerShell once to download the model, and keep Ollama running. Start the Flask app using the commands above and open http://127.0.0.1:5000. This local setup avoids paid API charges. On a laptop without a dedicated GPU, responses may be slower; available RAM affects performance. Keep `.env` private; it is excluded from Git.
 
 If PowerShell blocks activation, allow it for the current terminal only:
 
@@ -56,12 +57,15 @@ Open http://127.0.0.1:5000.
 
 | Variable | Purpose | Default |
 |---|---|---|
-| `XAI_API_KEY` | Enables live xAI API calls | Blank (demo mode) |
+| `AI_PROVIDER` | `ollama`, `demo`, or `xai` | `ollama` |
+| `OLLAMA_API_URL` | Local Ollama chat endpoint | `http://127.0.0.1:11434/api/chat` |
+| `OLLAMA_MODEL` | Model installed in Ollama | `qwen2.5:3b` |
+| `XAI_API_KEY` | Optional key when explicitly using xAI | Blank |
 | `XAI_MODEL` | Model ID available to your xAI account | `grok-4.6` |
 | `RATE_LIMIT_PER_MINUTE` | Per-client request cap per rolling minute | `20` |
 | `PORT` | Local or hosted port | `5000` |
 
-The API endpoint is `https://api.x.ai/v1/chat/completions`. Model access and billing depend on your xAI account; adjust `XAI_MODEL` to a model available to your account.
+By default, CareGuide calls Ollama at `http://127.0.0.1:11434/api/chat`, which runs on the same machine as Flask. Set `AI_PROVIDER=demo` for canned examples. Optional xAI integration requires `AI_PROVIDER=xai` and a valid `XAI_API_KEY`; this is not needed for the free local setup.
 
 ## Tests
 
@@ -71,13 +75,11 @@ python -m unittest discover -s tests -v
 
 Tests cover the homepage, health endpoint, input validation, emergency response path, demo mode, and security headers. They do not call the live model.
 
-## Deploy to Render
+## Local AI versus public deployment
 
-1. Sign in to [Render](https://render.com/), select **New + → Blueprint**, and connect this GitHub repository. Render will read `render.yaml`.
-2. In the service's Environment settings, add `XAI_API_KEY` as a secret environment variable. Do not put it in this repository.
-3. Deploy and check that `/api/health` responds with `{"status":"ok", ...}`.
+The default Ollama configuration is for local use on your own computer. If you deploy this Flask app to a public cloud host, `127.0.0.1` refers to that cloud server—not your laptop—so it cannot use Ollama running on your laptop. GitHub Pages cannot run the Flask backend or local model. Public hosting with AI at ₹0 depends on a separate free compute/provider option and its limits; a paid API is not included.
 
-The included Dockerfile can also be used on a compatible container host. Public hosting should use HTTPS and a production WSGI server (the Render configuration uses Gunicorn), not Flask's development server.
+The included Dockerfile can be used on a compatible container host. Public hosting should use HTTPS and a production WSGI server, not Flask’s development server.
 
 ## Medical and privacy limitations
 
