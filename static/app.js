@@ -25,7 +25,7 @@
     const live = mode === "grok" || mode === "ollama";
     modePill.classList.toggle("mode-live", live);
     modePill.classList.toggle("mode-demo", !live);
-    modeText.textContent = mode === "ollama" ? "LOCAL AI" : mode === "grok" ? "GROK AI" : "DEMO MODE";
+    modeText.textContent = mode === "ollama" ? "OLLAMA AI" : mode === "grok" ? "GROK AI" : "DEMO MODE";
     demoBanner.hidden = live;
   }
 
