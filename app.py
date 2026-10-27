@@ -22,6 +22,9 @@ app = Flask(__name__)
 app.config["MAX_CONTENT_LENGTH"] = 32 * 1024
 
 XAI_API_URL = "https://api.x.ai/v1/chat/completions"
+GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY", "").strip()
+GOOGLE_MODEL = os.getenv("GOOGLE_MODEL", "gemini-3.8-flash").strip()
+GOOGLE_API_URL = f"https://generativelanguage.googleapis.com/v1beta/models/{GOOGLE_MODEL}:generateContent"
 OLLAMA_API_KEY = os.getenv("OLLAMA_API_KEY", "").strip()
 _DEFAULT_OLLAMA_URL = "https://ollama.com/api/chat" if OLLAMA_API_KEY else "http://127.0.0.1:11434/api/chat"
 OLLAMA_API_URL = os.getenv("OLLAMA_API_URL", "").strip() or _DEFAULT_OLLAMA_URL
@@ -64,6 +67,8 @@ def current_mode() -> str:
     provider = os.getenv("AI_PROVIDER", "ollama").strip().lower()
     if provider == "demo":
         return "demo"
+    if provider in ("google", "gemini"):
+        return "google" if GOOGLE_API_KEY else "demo"
     if provider == "xai":
         return "grok" if os.getenv("XAI_API_KEY", "").strip() else "demo"
     return "ollama"
@@ -156,6 +161,35 @@ def call_ollama(messages: list[dict[str, str]]) -> str:
     return reply.strip()
 
 
+def call_google(messages: list[dict[str, str]]) -> str:
+    """Call Google's Gemini API. The key is kept server-side in an environment variable."""
+    contents = [
+        {
+            "role": "user" if message["role"] == "user" else "model",
+            "parts": [{"text": message["content"]}],
+        }
+        for message in messages
+    ]
+    payload = {
+        "systemInstruction": {"parts": [{"text": SYSTEM_PROMPT}]},
+        "contents": contents,
+        "generationConfig": {"temperature": 0.2, "maxOutputTokens": 1024},
+    }
+    response = requests.post(
+        GOOGLE_API_URL,
+        headers={"x-goog-api-key": GOOGLE_API_KEY, "Content-Type": "application/json"},
+        json=payload,
+        timeout=API_TIMEOUT_SECONDS,
+    )
+    response.raise_for_status()
+    data = response.json()
+    parts = data["candidates"][0]["content"]["parts"]
+    reply = "\\n".join(part["text"] for part in parts if isinstance(part.get("text"), str))
+    if not reply.strip():
+        raise ValueError("Google Gemini returned an empty response")
+    return reply.strip()
+
+
 def call_grok(messages: list[dict[str, str]]) -> str:
     api_key = os.getenv("XAI_API_KEY", "").strip()
     if not api_key:
@@ -241,14 +275,19 @@ def chat():
     if mode == "demo":
         return jsonify({"reply": demo_reply(latest), "mode": "demo", "emergency": False})
     try:
-        reply = call_grok(messages) if mode == "grok" else call_ollama(messages)
+        if mode == "grok":
+            reply = call_grok(messages)
+        elif mode == "google":
+            reply = call_google(messages)
+        else:
+            reply = call_ollama(messages)
         return jsonify({"reply": reply, "mode": mode, "emergency": False})
     except requests.Timeout:
         return jsonify({"error": "The AI model took too long to respond. Try again or use a smaller model."}), 504
     except requests.ConnectionError:
         if mode == "ollama" and not OLLAMA_API_KEY:
             return jsonify({"error": "Cannot reach local Ollama. Install it, start it, and run ollama run qwen2.5:3b, then retry."}), 503
-        app.logger.warning("xAI API connection failed", exc_info=True)
+        app.logger.warning("AI provider connection failed", exc_info=True)
         return jsonify({"error": "The AI service is unavailable right now. Please try again later."}), 502
     except requests.RequestException:
         app.logger.warning("AI provider request failed", exc_info=True)
