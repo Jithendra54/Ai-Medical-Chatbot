@@ -1,5 +1,4 @@
 import { CreateMLCEngine } from "@mlc-ai/web-llm";
-import "../static/styles.css";
 import "./style.css";
 
 const MODEL_ID = "Llama-3.2-1B-Instruct-q4f16_1-MLC";
