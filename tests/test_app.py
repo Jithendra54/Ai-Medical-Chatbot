@@ -19,7 +19,7 @@ class CareGuideTestCase(unittest.TestCase):
     def test_health_endpoint_has_mode(self):
         response = self.client.get('/api/health')
         self.assertEqual(response.status_code, 200)
-        self.assertIn(response.json['mode'], ('demo', 'grok', 'ollama'))
+        self.assertIn(response.json['mode'], ('demo', 'grok', 'ollama', 'google'))
 
     def test_rejects_missing_messages(self):
         response = self.client.post('/api/chat', json={})
