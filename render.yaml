@@ -4,12 +4,16 @@ services:
     runtime: python
     plan: free
     buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn --workers 2 --threads 4 --timeout 60 --bind 0.0.0.0:$PORT app:app
+    startCommand: gunicorn --workers 1 --threads 4 --timeout 120 --bind 0.0.0.0:$PORT app:app
     healthCheckPath: /api/health
     envVars:
-      - key: XAI_API_KEY
+      - key: AI_PROVIDER
+        value: ollama
+      - key: OLLAMA_API_URL
+        value: https://ollama.com/api/chat
+      - key: OLLAMA_MODEL
+        value: gemma4:31b
+      - key: OLLAMA_API_KEY
         sync: false
-      - key: XAI_MODEL
-        value: grok-4.6
       - key: RATE_LIMIT_PER_MINUTE
         value: "20"
