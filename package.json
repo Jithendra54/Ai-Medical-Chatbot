@@ -1,0 +1,17 @@
+{
+  "name": "careguide-browser-ai",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 0.0.0.0",
+    "build": "vite build",
+    "preview": "vite preview --host 0.0.0.0"
+  },
+  "dependencies": {
+    "@mlc-ai/web-llm": "0.2.86"
+  },
+  "devDependencies": {
+    "vite": "^6.4.1"
+  }
+}
