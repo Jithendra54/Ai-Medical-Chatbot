@@ -1,0 +1,35 @@
+@import "../static/styles.css";
+
+.start-ai-button {
+  border: 0;
+  border-radius: 10px;
+  padding: 10px 14px;
+  background: linear-gradient(135deg, #667be9, #4f63d4);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  box-shadow: 0 5px 12px #5b70df35;
+  transition: transform .2s, opacity .2s;
+  white-space: nowrap;
+}
+.start-ai-button:hover { transform: translateY(-1px); }
+.start-ai-button:disabled { opacity: .65; cursor: progress; }
+.notice-banner { align-items: flex-start; }
+.notice-content { min-width: 0; flex: 1; }
+.notice-content p { margin: 0; }
+.model-progress-wrap { display: grid; gap: 6px; margin-top: 9px; }
+.model-progress-wrap[hidden] { display: none; }
+.model-progress { height: 7px; width: 100%; border-radius: 999px; overflow: hidden; background: #f0e6d2; }
+.model-progress-fill { height: 100%; width: 0; border-radius: inherit; background: linear-gradient(90deg, #7187fa, #4a60d5); transition: width .2s ease; }
+.model-progress-wrap small { color: #8c724a; font-size: 10px; line-height: 1.4; }
+.mode-pill.mode-loading { color: #765c29; background: #fff5dc; }
+.mode-pill.mode-ready { color: #26745d; background: #e4f7f0; }
+.mode-pill.mode-error { color: #a13d4b; background: #ffe9ed; }
+.mode-pill.mode-ready .mode-dot { background: #20a779; }
+.model-status-note { color: #8b95a8; font-size: 10px; }
+@media (max-width: 760px) {
+  .start-ai-button { padding: 8px 9px; font-size: 9px; }
+  .topbar-right { gap: 5px; }
+  .notice-banner { gap: 8px; }
+  .model-progress-wrap small { font-size: 9px; }
+}
