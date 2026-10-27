@@ -8,12 +8,10 @@ services:
     healthCheckPath: /api/health
     envVars:
       - key: AI_PROVIDER
-        value: ollama
-      - key: OLLAMA_API_URL
-        value: https://ollama.com/api/chat
-      - key: OLLAMA_MODEL
-        value: gemma4:31b
-      - key: OLLAMA_API_KEY
+        value: google
+      - key: GOOGLE_MODEL
+        value: gemini-3.8-flash
+      - key: GOOGLE_API_KEY
         sync: false
       - key: RATE_LIMIT_PER_MINUTE
-        value: "20"
+        value: "10"
