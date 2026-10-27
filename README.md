@@ -9,7 +9,7 @@ CareGuide is a responsive web prototype based on the supplied **AI Chatbot (Medi
 - Hosted mode uses an Ollama API key stored only in the hosting provider’s secret environment variables.
 - Render deployment blueprint targets a free web service; Ollama starter-model usage is limited by the account’s included quota.
 - Short-term chat context held in browser memory; no chat database or server-side transcript logging.
-- Clearly labelled demo mode if `XAI_API_KEY` is not configured.
+- Clearly labelled demo mode when explicitly selected or when optional xAI mode lacks its key.
 - Basic emergency phrase screening, medical disclaimer, India emergency number 112.
 - Input validation, request-size bounds, basic per-IP rate limiting and security headers.
 - Unit tests, Dockerfile, Windows/macOS/Linux launchers, and Render deployment blueprint.
@@ -67,7 +67,7 @@ Open http://127.0.0.1:5000.
 | `RATE_LIMIT_PER_MINUTE` | Per-client request cap per rolling minute | `20` |
 | `PORT` | Local or hosted port | `5000` |
 
-When OLLAMA_API_KEY is present, CareGuide calls the hosted endpoint https://ollama.com/api/chat with bearer authentication. Without the key, it uses the local endpoint http://127.0.0.1:11434/api/chat. Use a model supported by your Ollama account. The website never sends the API key to the browser.
+When OLLAMA_API_KEY is present, CareGuide calls the hosted endpoint https://ollama.com/api/chat with bearer authentication and defaults to gemma4:31b. Without the key, it uses the local endpoint http://127.0.0.1:11434/api/chat and defaults to qwen2.5:3b. Use a model supported by your Ollama account. The website never sends the API key to the browser.
 
 ## Tests
 
