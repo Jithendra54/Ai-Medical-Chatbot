@@ -22,10 +22,10 @@
   }
 
   function setMode(mode) {
-    const live = mode === "grok" || mode === "ollama";
+    const live = mode === "grok" || mode === "ollama" || mode === "google";
     modePill.classList.toggle("mode-live", live);
     modePill.classList.toggle("mode-demo", !live);
-    modeText.textContent = mode === "ollama" ? "OLLAMA AI" : mode === "grok" ? "GROK AI" : "DEMO MODE";
+    modeText.textContent = mode === "google" ? "GEMINI AI" : mode === "ollama" ? "OLLAMA AI" : mode === "grok" ? "GROK AI" : "DEMO MODE";
     demoBanner.hidden = live;
   }
 
