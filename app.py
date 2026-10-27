@@ -22,9 +22,11 @@ app = Flask(__name__)
 app.config["MAX_CONTENT_LENGTH"] = 32 * 1024
 
 XAI_API_URL = "https://api.x.ai/v1/chat/completions"
-OLLAMA_API_URL = os.getenv("OLLAMA_API_URL", "http://127.0.0.1:11434/api/chat")
+OLLAMA_API_KEY = os.getenv("OLLAMA_API_KEY", "").strip()
+_DEFAULT_OLLAMA_URL = "https://ollama.com/api/chat" if OLLAMA_API_KEY else "http://127.0.0.1:11434/api/chat"
+OLLAMA_API_URL = os.getenv("OLLAMA_API_URL", _DEFAULT_OLLAMA_URL)
 DEFAULT_MODEL = os.getenv("XAI_MODEL", "grok-4.6")
-OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "qwen2.5:3b")
+OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "gemma4:31b" if OLLAMA_API_KEY else "qwen2.5:3b")
 MAX_MESSAGE_CHARS = 2_000
 MAX_HISTORY_MESSAGES = 12
 MAX_HISTORY_CHARS = 10_000
@@ -141,12 +143,15 @@ def call_ollama(messages: list[dict[str, str]]) -> str:
         "stream": False,
         "options": {"temperature": 0.2},
     }
-    response = requests.post(OLLAMA_API_URL, json=payload, timeout=API_TIMEOUT_SECONDS)
+    headers = {"Content-Type": "application/json"}
+    if OLLAMA_API_KEY:
+        headers["Authorization"] = f"Bearer {OLLAMA_API_KEY}"
+    response = requests.post(OLLAMA_API_URL, headers=headers, json=payload, timeout=API_TIMEOUT_SECONDS)
     response.raise_for_status()
     data = response.json()
     reply = data["message"]["content"]
     if not isinstance(reply, str) or not reply.strip():
-        raise ValueError("The local AI model returned an empty response")
+        raise ValueError("The Ollama model returned an empty response")
     return reply.strip()
 
 
@@ -240,8 +245,8 @@ def chat():
     except requests.Timeout:
         return jsonify({"error": "The AI model took too long to respond. Try again or use a smaller model."}), 504
     except requests.ConnectionError:
-        if mode == "ollama":
-            return jsonify({"error": "Cannot reach Ollama. Install it, start it, and run ollama run qwen2.5:3b, then retry."}), 503
+        if mode == "ollama" and not OLLAMA_API_KEY:
+            return jsonify({"error": "Cannot reach local Ollama. Install it, start it, and run ollama run qwen2.5:3b, then retry."}), 503
         app.logger.warning("xAI API connection failed", exc_info=True)
         return jsonify({"error": "The AI service is unavailable right now. Please try again later."}), 502
     except requests.RequestException:
