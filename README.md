@@ -1,12 +1,13 @@
 # CareGuide — AI Medical Chatbot
 
-CareGuide is a responsive web prototype based on the supplied **AI Chatbot (Medical Care)** synopsis. It uses a browser interface and Python/Flask backend. The default AI provider is a local Ollama model, so no paid API key is required.
+CareGuide is a responsive web prototype based on the supplied **AI Chatbot (Medical Care)** synopsis. It uses a browser interface and Python/Flask backend. It supports local Ollama and Ollama’s hosted API. Public deployment stores the API key as a server-side secret, never in browser code.
 
 ## Features
 
 - Responsive medical chat interface for desktop and mobile.
-- Local AI responses through Ollama by default; no paid API key or per-message API fee.
-- Optional xAI integration only if AI_PROVIDER=xai is deliberately configured.
+- Supports local Ollama for development and hosted Ollama API for the public website.
+- Hosted mode uses an Ollama API key stored only in the hosting provider’s secret environment variables.
+- Render deployment blueprint targets a free web service; Ollama starter-model usage is limited by the account’s included quota.
 - Short-term chat context held in browser memory; no chat database or server-side transcript logging.
 - Clearly labelled demo mode if `XAI_API_KEY` is not configured.
 - Basic emergency phrase screening, medical disclaimer, India emergency number 112.
@@ -29,7 +30,7 @@ notepad .env
 python app.py
 ```
 
-Install [Ollama](https://ollama.com/download) for Windows. Then run `ollama run qwen2.5:3b` in PowerShell once to download the model, and keep Ollama running. Start the Flask app using the commands above and open http://127.0.0.1:5000. This local setup avoids paid API charges. On a laptop without a dedicated GPU, responses may be slower; available RAM affects performance. Keep `.env` private; it is excluded from Git.
+For a local run, install [Ollama](https://ollama.com/download) for Windows and run ollama run qwen2.5:3b in PowerShell, then start Flask and open http://127.0.0.1:5000. For the public website, follow “Deploy the website for free” below. Never paste an API key into source files or commit the .env file.
 
 If PowerShell blocks activation, allow it for the current terminal only:
 
@@ -47,7 +48,7 @@ python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 cp .env.example .env
-# Edit .env and set XAI_API_KEY if you want live answers.
+# For local inference: ollama run qwen2.5:3b
 python app.py
 ```
 
@@ -58,14 +59,15 @@ Open http://127.0.0.1:5000.
 | Variable | Purpose | Default |
 |---|---|---|
 | `AI_PROVIDER` | `ollama`, `demo`, or `xai` | `ollama` |
-| `OLLAMA_API_URL` | Local Ollama chat endpoint | `http://127.0.0.1:11434/api/chat` |
-| `OLLAMA_MODEL` | Model installed in Ollama | `qwen2.5:3b` |
+| `OLLAMA_API_KEY` | Hosted Ollama API key (server secret) | Blank for local mode |
+| `OLLAMA_API_URL` | Hosted or local chat endpoint | Auto-selects based on API key |
+| `OLLAMA_MODEL` | Hosted or locally installed model | `gemma4:31b` hosted / `qwen2.5:3b` local |
 | `XAI_API_KEY` | Optional key when explicitly using xAI | Blank |
 | `XAI_MODEL` | Model ID available to your xAI account | `grok-4.6` |
 | `RATE_LIMIT_PER_MINUTE` | Per-client request cap per rolling minute | `20` |
 | `PORT` | Local or hosted port | `5000` |
 
-By default, CareGuide calls Ollama at `http://127.0.0.1:11434/api/chat`, which runs on the same machine as Flask. Set `AI_PROVIDER=demo` for canned examples. Optional xAI integration requires `AI_PROVIDER=xai` and a valid `XAI_API_KEY`; this is not needed for the free local setup.
+When OLLAMA_API_KEY is present, CareGuide calls the hosted endpoint https://ollama.com/api/chat with bearer authentication. Without the key, it uses the local endpoint http://127.0.0.1:11434/api/chat. Use a model supported by your Ollama account. The website never sends the API key to the browser.
 
 ## Tests
 
@@ -75,18 +77,26 @@ python -m unittest discover -s tests -v
 
 Tests cover the homepage, health endpoint, input validation, emergency response path, demo mode, and security headers. They do not call the live model.
 
-## Local AI versus public deployment
+## Deploy the website for free
 
-The default Ollama configuration is for local use on your own computer. If you deploy this Flask app to a public cloud host, `127.0.0.1` refers to that cloud server—not your laptop—so it cannot use Ollama running on your laptop. GitHub Pages cannot run the Flask backend or local model. Public hosting with AI at ₹0 depends on a separate free compute/provider option and its limits; a paid API is not included.
+This repository includes a Render Blueprint for a free Flask web service connected to the hosted Ollama API. Render free services can sleep after inactivity, so the first visit after a quiet period may take around a minute. Ollama’s free account includes limited monthly starter-model usage, not unlimited inference; do not add purchased credits or select paid models if you require a ₹0 budget.
 
-The included Dockerfile can be used on a compatible container host. Public hosting should use HTTPS and a production WSGI server, not Flask’s development server.
+1. Open the [Render Dashboard](https://dashboard.render.com/) and choose New + → Blueprint.
+2. Connect GitHub and select Jithendra54/Ai-Medical-Chatbot on branch main.
+3. Review the Blueprint. When asked for OLLAMA_API_KEY, enter your key as a secret environment variable. If Render does not prompt for it, open the service’s Environment tab and add OLLAMA_API_KEY as a secret.
+4. Keep the instance plan set to Free. Do not add a payment method or buy Ollama credits.
+5. Deploy. After the build succeeds, open the generated onrender.com URL and test the chatbot. Check /api/health if needed.
+
+Security: Never put the key into app.py, HTML, JavaScript, README, or a public GitHub issue. If a key has already been exposed, revoke it and create a replacement in [Ollama API key settings](https://ollama.com/settings/keys).
+
+The included Dockerfile can also be used on a compatible container host. Public hosting should use HTTPS and a production WSGI server.
 
 ## Medical and privacy limitations
 
 - Educational prototype only, **not a medical device, diagnostic system, emergency triage, or substitute for a licensed clinician**. The emergency phrase check can miss emergencies and can generate false alerts; never rely on it to determine risk.
 - For potentially life-threatening symptoms, call emergency services. In India call **112**; elsewhere use the local emergency number.
 - Demo replies are static examples, not AI-generated or clinically validated.
-- The app itself does not persist chat transcripts. In live mode, conversation messages are sent to xAI to generate replies. Review the provider's current policies before entering health or sensitive information. Do not include names, addresses, ID numbers, or identifying details.
+- The app itself does not persist chat transcripts. In hosted mode, conversation messages are sent to Ollama's cloud to generate replies. Review the provider's current policies before entering health or sensitive information. Do not include names, addresses, ID numbers, or identifying details.
 - Before real-world clinical use, seek qualified medical review and complete safety, privacy, security, and legal/regulatory assessments.
 
 ## Project structure
