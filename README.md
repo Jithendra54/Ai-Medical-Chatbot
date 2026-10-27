@@ -1,117 +1,56 @@
-# CareGuide — AI Medical Chatbot
+# CareGuide — Browser AI Medical Chatbot
 
-CareGuide is a responsive web prototype based on the supplied **AI Chatbot (Medical Care)** synopsis. It uses a browser interface and Python/Flask backend, with Google Gemini as the configured hosted AI provider. API keys are stored server-side and are never sent to browser code.
+CareGuide is a static website that runs a small open model directly in each visitor's browser using WebLLM and WebGPU. It does not require an AI API key, a Flask server, or paid AI inference.
 
-## Features
+## Live site
 
-- Responsive medical chat interface for desktop and mobile.
-- Google Gemini API integration for hosted website responses.
-- Google API key is stored only in the hosting provider’s secret environment variables.
-- Render deployment blueprint targets a free web service; Gemini API free-tier quotas and model availability are controlled by Google.
-- Short-term chat context held in browser memory; no chat database or server-side transcript logging.
-- Clearly labelled demo mode when explicitly selected or when optional xAI mode lacks its key.
-- Basic emergency phrase screening, medical disclaimer, India emergency number 112.
-- Input validation, request-size bounds, basic per-IP rate limiting and security headers.
-- Unit tests, Dockerfile, Windows/macOS/Linux launchers, and Render deployment blueprint.
+After GitHub Pages is enabled and the deployment workflow succeeds, the site should be available at:
 
-## Run locally on Windows
+**https://jithendra54.github.io/Ai-Medical-Chatbot/**
 
-Requires Python 3.10+ and internet access for the first dependency install.
+## How it works
 
-1. Download or clone this repository.
-2. Double-click `start_windows.bat`, or open PowerShell in this folder and run:
+- **AI engine:** WebLLM with the built-in `Llama-3.2-1B-Instruct-q4f16_1-MLC` model.
+- **No API keys:** requests are not sent to Google, Ollama, or a hosted AI provider.
+- **On-device inference:** the model runs in the visitor's browser using WebGPU.
+- **Model caching:** WebLLM caches model artifacts in the browser where supported, to reduce repeat downloads.
+- **Privacy:** chat history remains in page memory and is not sent to a CareGuide server.
+- **Automatic deployment:** pushes to `main` build the Vite site and deploy it with GitHub Pages.
 
-```powershell
-py -m venv .venv
-.\.venv\Scripts\Activate.ps1
-pip install -r requirements.txt
-Copy-Item .env.example .env
-notepad .env
-python app.py
-```
+WebLLM is a third-party open-source project. Read its documentation at https://github.com/mlc-ai/web-llm.
 
-For a local run, install [Ollama](https://ollama.com/download) for Windows and run ollama run qwen2.5:3b in PowerShell, then start Flask and open http://127.0.0.1:5000. For the public website, follow “Deploy the website for free” below. Never paste an API key into source files or commit the .env file.
+## Requirements and limitations
 
-If PowerShell blocks activation, allow it for the current terminal only:
+- A modern browser with working WebGPU is required; Chrome or Edge are reasonable first choices.
+- The first use downloads large model files. This can take time and uses bandwidth/storage on the visitor's device.
+- Performance depends on browser, graphics hardware, available memory and thermal limits. Devices without compatible WebGPU support cannot use this browser-only AI.
+- This is a small general-purpose model, not a medical model. It can make errors and must not be used for diagnosis, emergency triage, or treatment decisions.
+- The site is free to host on GitHub Pages for a public repository, but the visitor's data/bandwidth costs are their own. No AI inference API billing is involved.
 
-```powershell
-Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
-.\.venv\Scripts\Activate.ps1
-```
+## Deploy
 
-## macOS / Linux
+1. Open **Settings → Pages** for this repository.
+2. Set **Build and deployment → Source** to **GitHub Actions**.
+3. Open the **Actions** tab and check the workflow named **Build and deploy CareGuide to GitHub Pages**.
+4. Once the workflow finishes successfully, open https://jithendra54.github.io/Ai-Medical-Chatbot/.
 
-Run `./start_mac_linux.sh`, or use:
+The workflow runs on every push to `main`; no secrets are required.
+
+## Local development
+
+Requires Node.js 22+ and npm:
 
 ```bash
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-cp .env.example .env
-# For local inference: ollama run qwen2.5:3b
-python app.py
+npm install
+npm run dev
 ```
 
-Open http://127.0.0.1:5000.
+Open the local URL shown by Vite. To test WebGPU inference locally, use a browser with WebGPU enabled.
 
-## Configuration
+## Medical safety
 
-| Variable | Purpose | Default |
-|---|---|---|
-| `AI_PROVIDER` | `google`, `ollama`, `demo`, or `xai` | `google` on Render; `ollama` locally |
-| `GOOGLE_API_KEY` | Gemini key stored server-side only | Blank until configured |\n| `GOOGLE_MODEL` | Gemini model name | `gemini-3.8-flash` |\n| `OLLAMA_API_KEY` | Optional hosted Ollama key | Blank for local mode |
-| `OLLAMA_API_URL` | Hosted or local chat endpoint | Auto-selects based on API key |
-| `OLLAMA_MODEL` | Hosted or locally installed model | `gemma4:31b` hosted / `qwen2.5:3b` local |
-| `XAI_API_KEY` | Optional key when explicitly using xAI | Blank |
-| `XAI_MODEL` | Model ID available to your xAI account | `grok-4.6` |
-| `RATE_LIMIT_PER_MINUTE` | Per-client request cap per rolling minute | `20` |
-| `PORT` | Local or hosted port | `5000` |
+CareGuide is an informational student project, not a medical device or substitute for a qualified healthcare professional. It cannot reliably diagnose illness or detect every emergency. For potentially life-threatening symptoms, call emergency services; in India call 112. Do not enter identifying or sensitive patient information.
 
-When AI_PROVIDER=google and GOOGLE_API_KEY is set, the backend calls the Gemini generateContent API with the key in the x-goog-api-key header. The browser never receives the key. For local development, AI_PROVIDER=ollama can be used with an Ollama server.
+## License and attribution
 
-## Tests
-
-```powershell
-python -m unittest discover -s tests -v
-```
-
-Tests cover the homepage, health endpoint, input validation, emergency response path, demo mode, and security headers. They do not call the live model.
-
-## Deploy the website for free
-
-The Render Blueprint is configured for Google Gemini using a secret environment variable.
-
-1. Open the [Render Dashboard](https://dashboard.render.com/) and choose **New + → Blueprint**.
-2. Connect GitHub and select `Jithendra54/Ai-Medical-Chatbot` on branch `main`.
-3. Set `GOOGLE_API_KEY` to a **new replacement key** under the service's Environment settings. Do not paste it into the source code, HTML, JavaScript, or GitHub.
-4. Keep the service plan set to **Free**. Do not enable paid billing or add credits if your budget is ₹0.
-5. Deploy. Open the `onrender.com` URL created by Render and test the chat. The free web service can sleep after inactivity.
-
-Google's Gemini API offers a free tier for selected models, subject to rate and usage limits; verify current terms and quotas for your Google project. Free-tier data handling may differ from paid tiers. Because this is a health-information prototype, do not enter identifiable or sensitive patient details.
-
-**Key security:** A key pasted into a chat is exposed. Revoke or rotate it in [Google AI Studio API keys](https://aistudio.google.com/apikey) or the Google Cloud Credentials page, then enter only the replacement as a Render secret.
-
-## Medical and privacy limitations
-
-- Educational prototype only, **not a medical device, diagnostic system, emergency triage, or substitute for a licensed clinician**. The emergency phrase check can miss emergencies and can generate false alerts; never rely on it to determine risk.
-- For potentially life-threatening symptoms, call emergency services. In India call **112**; elsewhere use the local emergency number.
-- Demo replies are static examples, not AI-generated or clinically validated.
-- The app itself does not persist chat transcripts. In hosted mode, conversation messages are sent to Ollama's cloud to generate replies. Review the provider's current policies before entering health or sensitive information. Do not include names, addresses, ID numbers, or identifying details.
-- Before real-world clinical use, seek qualified medical review and complete safety, privacy, security, and legal/regulatory assessments.
-
-## Project structure
-
-```text
-app.py
-templates/index.html
-static/styles.css
-static/app.js
-tests/test_app.py
-.env.example
-requirements.txt
-start_windows.bat
-start_mac_linux.sh
-Dockerfile
-render.yaml
-NOTICE.txt
-```
+WebLLM is distributed under the Apache-2.0 license by its maintainers. See https://github.com/mlc-ai/web-llm/blob/main/LICENSE for its license.
