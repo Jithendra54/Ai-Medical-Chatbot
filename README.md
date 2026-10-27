@@ -1,13 +1,13 @@
 # CareGuide — AI Medical Chatbot
 
-CareGuide is a responsive web prototype based on the supplied **AI Chatbot (Medical Care)** synopsis. It uses a browser interface and Python/Flask backend. It supports local Ollama and Ollama’s hosted API. Public deployment stores the API key as a server-side secret, never in browser code.
+CareGuide is a responsive web prototype based on the supplied **AI Chatbot (Medical Care)** synopsis. It uses a browser interface and Python/Flask backend, with Google Gemini as the configured hosted AI provider. API keys are stored server-side and are never sent to browser code.
 
 ## Features
 
 - Responsive medical chat interface for desktop and mobile.
-- Supports local Ollama for development and hosted Ollama API for the public website.
-- Hosted mode uses an Ollama API key stored only in the hosting provider’s secret environment variables.
-- Render deployment blueprint targets a free web service; Ollama starter-model usage is limited by the account’s included quota.
+- Google Gemini API integration for hosted website responses.
+- Google API key is stored only in the hosting provider’s secret environment variables.
+- Render deployment blueprint targets a free web service; Gemini API free-tier quotas and model availability are controlled by Google.
 - Short-term chat context held in browser memory; no chat database or server-side transcript logging.
 - Clearly labelled demo mode when explicitly selected or when optional xAI mode lacks its key.
 - Basic emergency phrase screening, medical disclaimer, India emergency number 112.
@@ -58,8 +58,8 @@ Open http://127.0.0.1:5000.
 
 | Variable | Purpose | Default |
 |---|---|---|
-| `AI_PROVIDER` | `ollama`, `demo`, or `xai` | `ollama` |
-| `OLLAMA_API_KEY` | Hosted Ollama API key (server secret) | Blank for local mode |
+| `AI_PROVIDER` | `google`, `ollama`, `demo`, or `xai` | `google` on Render; `ollama` locally |
+| `GOOGLE_API_KEY` | Gemini key stored server-side only | Blank until configured |\n| `GOOGLE_MODEL` | Gemini model name | `gemini-3.8-flash` |\n| `OLLAMA_API_KEY` | Optional hosted Ollama key | Blank for local mode |
 | `OLLAMA_API_URL` | Hosted or local chat endpoint | Auto-selects based on API key |
 | `OLLAMA_MODEL` | Hosted or locally installed model | `gemma4:31b` hosted / `qwen2.5:3b` local |
 | `XAI_API_KEY` | Optional key when explicitly using xAI | Blank |
@@ -67,7 +67,7 @@ Open http://127.0.0.1:5000.
 | `RATE_LIMIT_PER_MINUTE` | Per-client request cap per rolling minute | `20` |
 | `PORT` | Local or hosted port | `5000` |
 
-When OLLAMA_API_KEY is present, CareGuide calls the hosted endpoint https://ollama.com/api/chat with bearer authentication and defaults to gemma4:31b. Without the key, it uses the local endpoint http://127.0.0.1:11434/api/chat and defaults to qwen2.5:3b. Use a model supported by your Ollama account. The website never sends the API key to the browser.
+When AI_PROVIDER=google and GOOGLE_API_KEY is set, the backend calls the Gemini generateContent API with the key in the x-goog-api-key header. The browser never receives the key. For local development, AI_PROVIDER=ollama can be used with an Ollama server.
 
 ## Tests
 
@@ -79,17 +79,17 @@ Tests cover the homepage, health endpoint, input validation, emergency response 
 
 ## Deploy the website for free
 
-This repository includes a Render Blueprint for a free Flask web service connected to the hosted Ollama API. Render free services can sleep after inactivity, so the first visit after a quiet period may take around a minute. Ollama’s free account includes limited monthly starter-model usage, not unlimited inference; do not add purchased credits or select paid models if you require a ₹0 budget.
+The Render Blueprint is configured for Google Gemini using a secret environment variable.
 
-1. Open the [Render Dashboard](https://dashboard.render.com/) and choose New + → Blueprint.
-2. Connect GitHub and select Jithendra54/Ai-Medical-Chatbot on branch main.
-3. Review the Blueprint. When asked for OLLAMA_API_KEY, enter your key as a secret environment variable. If Render does not prompt for it, open the service’s Environment tab and add OLLAMA_API_KEY as a secret.
-4. Keep the instance plan set to Free. Do not add a payment method or buy Ollama credits.
-5. Deploy. After the build succeeds, open the generated onrender.com URL and test the chatbot. Check /api/health if needed.
+1. Open the [Render Dashboard](https://dashboard.render.com/) and choose **New + → Blueprint**.
+2. Connect GitHub and select `Jithendra54/Ai-Medical-Chatbot` on branch `main`.
+3. Set `GOOGLE_API_KEY` to a **new replacement key** under the service's Environment settings. Do not paste it into the source code, HTML, JavaScript, or GitHub.
+4. Keep the service plan set to **Free**. Do not enable paid billing or add credits if your budget is ₹0.
+5. Deploy. Open the `onrender.com` URL created by Render and test the chat. The free web service can sleep after inactivity.
 
-Security: Never put the key into app.py, HTML, JavaScript, README, or a public GitHub issue. If a key has already been exposed, revoke it and create a replacement in [Ollama API key settings](https://ollama.com/settings/keys).
+Google's Gemini API offers a free tier for selected models, subject to rate and usage limits; verify current terms and quotas for your Google project. Free-tier data handling may differ from paid tiers. Because this is a health-information prototype, do not enter identifiable or sensitive patient details.
 
-The included Dockerfile can also be used on a compatible container host. Public hosting should use HTTPS and a production WSGI server.
+**Key security:** A key pasted into a chat is exposed. Revoke or rotate it in [Google AI Studio API keys](https://aistudio.google.com/apikey) or the Google Cloud Credentials page, then enter only the replacement as a Render secret.
 
 ## Medical and privacy limitations
 
