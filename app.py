@@ -18,11 +18,11 @@ Encourage professional advice for worrying, persistent, severe, or worsening sym
 This model can be wrong. Encourage verification with a qualified professional."""
 
 EMERGENCY_PATTERNS = [
-    r"\\b(chest pain|pressure in (my )?chest)\\b",
-    r"\\b(can't breathe|cannot breathe|difficulty breathing|shortness of breath)\\b",
-    r"\\b(face droop|slurred speech|sudden weakness|stroke symptoms?)\\b",
-    r"\\b(unconscious|not waking up|severe bleeding|throat closing|overdose|active seizure)\\b",
-    r"\\b(kill myself|suicidal intent|going to harm myself)\\b",
+    r"\b(chest pain|pressure in (my )?chest)\b",
+    r"\b(can't breathe|cannot breathe|difficulty breathing|shortness of breath)\b",
+    r"\b(face droop|slurred speech|sudden weakness|stroke symptoms?)\b",
+    r"\b(unconscious|not waking up|severe bleeding|throat closing|overdose|active seizure)\b",
+    r"\b(kill myself|suicidal intent|going to harm myself)\b",
 ]
 HEALTH_SOURCES = [
     {
@@ -62,9 +62,9 @@ def grounded_answer(question, sources):
     if not sources:
         return OUT_OF_SCOPE_REPLY
     if not os.environ.get("OPENAI_API_KEY"):
-        excerpts = "\\n\\n".join(source["text"] for source in sources)
-        citations = "\\n".join("Source: " + source["title"] + " — " + source["url"] for source in sources)
-        return excerpts + "\\n\\n" + citations + "\\n\\nGeneral information only; this is not a diagnosis."
+        excerpts = "\n\n".join(source["text"] for source in sources)
+        citations = "\n".join("Source: " + source["title"] + " — " + source["url"] for source in sources)
+        return excerpts + "\n\n" + citations + "\n\nGeneral information only; this is not a diagnosis."
     return None
 
 EMERGENCY_REPLY = ("Please seek urgent medical help now. Do not wait for an AI response. "
@@ -191,11 +191,11 @@ class Handler(BaseHTTPRequestHandler):
                 self._send(200, json.dumps({"reply": OUT_OF_SCOPE_REPLY}))
                 return
             raw_history = payload.get("history", [])
-            source_context = "\\n".join(
+            source_context = "\n".join(
                 source["title"] + " (" + source["url"] + "): " + source["text"]
                 for source in sources
             )
-            grounded_system_prompt = SYSTEM_PROMPT + "\\nAnswer only from the following retrieved source passages. If they do not support an answer, say so. Include the source title and URL in your response. Do not infer a diagnosis.\\n" + source_context
+            grounded_system_prompt = SYSTEM_PROMPT + "\nAnswer only from the following retrieved source passages. If they do not support an answer, say so. Include the source title and URL in your response. Do not infer a diagnosis.\n" + source_context
             messages = [{"role": "system", "content": grounded_system_prompt}]
             if isinstance(raw_history, list):
                 for item in raw_history[-8:]:
@@ -207,7 +207,8 @@ class Handler(BaseHTTPRequestHandler):
             with urlopen(req, timeout=45) as response:
                 result = json.loads(response.read(1000000))
             reply = result["choices"][0]["message"]["content"]
-            citations = "\\n\\nSources: " + ", ".join(source["title"] + " (" + source["url"] + ")" for source in sources)\n            self._send(200, json.dumps({"reply": reply + citations}))
+            citations = "\n\nSources: " + ", ".join(source["title"] + " (" + source["url"] + ")" for source in sources)
+            self._send(200, json.dumps({"reply": reply + citations}))
         except HTTPError as exc:
             self._send(502, json.dumps({"error": "The AI provider returned an error. Check its API key, model access, and usage limits."}))
         except (URLError, TimeoutError):
