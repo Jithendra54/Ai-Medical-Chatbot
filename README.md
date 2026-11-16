@@ -38,4 +38,4 @@ This is an informational student project, not a medical device or substitute for
 
 ## Deployment migration
 
-The existing GitHub Pages workflow serves the previous static WebLLM app. A Python server cannot run on GitHub Pages. This branch adds a Render blueprint, but a Render account/service is still needed before the Python app is live.
+The former Vite/WebLLM frontend and GitHub Pages deployment workflow have been removed from this branch. A Python server cannot run on GitHub Pages. A Render account/service is still needed before the Python app is live.
