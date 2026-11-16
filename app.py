@@ -1,13 +1,20 @@
+import html
 import json
 import os
 import re
+import threading
+import time
+import xml.etree.ElementTree as ET
 from urllib.error import HTTPError, URLError
+from urllib.parse import urlencode, urlparse
 from urllib.request import Request, urlopen
 
 import streamlit as st
 
 MODEL = os.environ.get("OPENAI_MODEL", "gpt-4o-mini")
 API_URL = os.environ.get("OPENAI_BASE_URL", "https://api.openai.com/v1/chat/completions")
+NLM_URL = "https://wsearch.nlm.nih.gov/ws/query"
+NLM_TOOL_NAME = "careguide_health_chatbot"
 
 st.set_page_config(page_title="CareGuide", page_icon="✚", layout="wide")
 st.markdown("""
@@ -21,13 +28,13 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# Short paraphrased notes indexed from linked public-health references.
-# This is retrieval over a small curated library, not model training or diagnosis.
+# Curated, paraphrased notes from public-health references. The live MedlinePlus
+# search below adds relevant topics; this is retrieval, not model training.
 SOURCES = [
     {
         "title": "Everyday health habits (CDC)",
         "url": "https://www.cdc.gov/howrightnow/taking-care/index.html",
-        "keywords": {"health", "healthy", "improve", "improving", "tips", "tip", "wellness", "wellbeing", "lifestyle", "habits", "habit", "better", "general", "everyday", "prevent", "prevention", "live", "living", "routine"},
+        "keywords": {"health", "healthy", "improve", "improving", "tips", "tip", "wellness", "wellbeing", "lifestyle", "habits", "habit", "better", "general", "everyday", "live", "living"},
         "passage": "A practical starting point is to build a few sustainable habits: eat a variety of vegetables, fruits, whole grains, and protein; move more and sit less, starting with an amount that fits your current ability; keep a regular sleep schedule; stay connected and use relaxing activities to manage stress; avoid tobacco; and keep up with health appointments, recommended vaccines, and screenings. You do not need to change everything at once. If you have a health condition, disability, are pregnant, or are unsure what is safe for you, ask a clinician for personalized guidance.",
         "citations": [
             ("CDC: Taking Care of Your Body", "https://www.cdc.gov/howrightnow/taking-care/index.html"),
@@ -133,13 +140,15 @@ STOP_WORDS = {
     "from", "give", "help", "how", "i", "im", "is", "it", "me", "my", "of", "on", "please",
     "should", "some", "the", "to", "what", "when", "with", "would", "you", "your",
 }
+_NLM_LOCK = threading.Lock()
+_LAST_NLM_REQUEST = 0.0
 
 def normalize_words(text):
-    words = set(re.findall(r"[a-z]+", text.lower()))
-    return {word for word in words if word not in STOP_WORDS and len(word) > 2}
+    words = re.findall(r"[a-z]+", text.lower())
+    return [word for word in words if word not in STOP_WORDS and len(word) > 2]
 
 def retrieve_sources(question):
-    query_words = normalize_words(question)
+    query_words = set(normalize_words(question))
     if not query_words:
         return []
 
@@ -154,25 +163,98 @@ def retrieve_sources(question):
             scored.append((score, source))
     scored.sort(key=lambda item: item[0], reverse=True)
 
-    # Broad questions get a practical overview, while specific topic words still
-    # bring their matching source to the top.
     if broad_health and (not scored or scored[0][0] <= 1):
         overview = SOURCES[0]
         related = [source for _, source in scored if source is not overview]
         return [overview] + related[:3]
     return [source for score, source in scored[:4] if score > 0]
 
+def build_medlineplus_query(question):
+    # Send only a short set of topic keywords, never the conversation history.
+    words = normalize_words(question)
+    generic = {"health", "healthy", "improve", "improving", "tips", "tip", "better", "wellness", "wellbeing"}
+    terms = []
+    for word in words:
+        if word not in generic and word not in terms:
+            terms.append(word)
+        if len(terms) == 6:
+            break
+    if not terms:
+        return "healthy living"
+    return " ".join(terms)
+
+@st.cache_data(ttl=43200, show_spinner=False)
+def search_medlineplus(topic_terms):
+    global _LAST_NLM_REQUEST
+    params = urlencode({
+        "db": "healthTopics",
+        "term": topic_terms,
+        "rettype": "brief",
+        "retmax": 4,
+        "tool": NLM_TOOL_NAME,
+    })
+    request = Request(
+        NLM_URL + "?" + params,
+        headers={"User-Agent": "CareGuideStudentHealthInfo/1.0", "Accept": "application/xml"},
+    )
+    try:
+        with _NLM_LOCK:
+            pause = max(0.0, 0.85 - (time.monotonic() - _LAST_NLM_REQUEST))
+            if pause:
+                time.sleep(pause)
+            with urlopen(request, timeout=8) as response:
+                xml_data = response.read(1_500_000)
+            _LAST_NLM_REQUEST = time.monotonic()
+
+        root = ET.fromstring(xml_data)
+        results = []
+        for document in root.findall(".//document"):
+            url = document.attrib.get("url", "")
+            host = urlparse(url).hostname or ""
+            if host != "medlineplus.gov" and not host.endswith(".medlineplus.gov"):
+                continue
+
+            fields = {}
+            for item in document.findall("content"):
+                name = item.attrib.get("name", "")
+                if name and name not in fields:
+                    fields[name] = item.text or ""
+
+            title = re.sub(r"\s+", " ", html.unescape(fields.get("title", ""))).strip()
+            raw_text = fields.get("full-summary") or fields.get("snippet") or ""
+            passage = html.unescape(raw_text)
+            passage = re.sub(r"<[^>]*>", " ", passage)
+            passage = re.sub(r"\s+", " ", passage).strip()
+            if title and passage:
+                results.append({
+                    "title": "MedlinePlus: " + title,
+                    "url": url,
+                    "passage": passage[:1200],
+                    "citations": [("MedlinePlus: " + title, url)],
+                })
+        return results
+    except (HTTPError, URLError, TimeoutError, ET.ParseError, ValueError):
+        return []
+
 def answer_question(question, history):
     if any(re.search(pattern, question, re.I) for pattern in EMERGENCY_PATTERNS):
         return EMERGENCY_REPLY, []
 
     sources = retrieve_sources(question)
+    online_sources = search_medlineplus(build_medlineplus_query(question))
+    seen_urls = {source["url"] for source in sources}
+    for source in online_sources:
+        if source["url"] not in seen_urls:
+            sources.append(source)
+            seen_urls.add(source["url"])
+        if len(sources) >= 5:
+            break
+
     if not sources:
         return (
-            "I couldn't find a relevant section in CareGuide's health library for that question. "
-            "Try asking about everyday health habits, food, exercise, sleep, stress, hydration, handwashing, "
-            "preventive care, common colds, or preparing for a doctor visit. "
-            "For personal medical advice, contact a qualified healthcare professional.",
+            "I couldn't find a useful match in the health library or MedlinePlus search. "
+            "Try asking about food, exercise, sleep, stress, hydration, handwashing, preventive care, "
+            "common symptoms, or preparing for a doctor visit. For personal medical advice, contact a qualified professional.",
             [],
         )
 
@@ -216,6 +298,15 @@ def answer_question(question, history):
         )
         return answer + "\n\nThe optional AI service was unavailable, so these source notes are shown directly.", sources
 
+def render_sources(sources):
+    st.markdown("**Sources**")
+    seen = set()
+    for source in sources:
+        for title, url in source["citations"]:
+            if url not in seen:
+                seen.add(url)
+                st.markdown(f"- [{title}]({url})")
+
 st.title("✚ CareGuide")
 st.caption("Health information, made clearer")
 with st.sidebar:
@@ -237,7 +328,8 @@ with st.sidebar:
     st.error("**Need urgent help?** Do not wait for an AI response if someone may be in danger. In India call **112**; elsewhere call your local emergency number.")
     st.caption("Avoid sharing names or identifying details.")
 
-st.info("For education only. CareGuide cannot diagnose or replace professional medical care. Answers are based on a small library of linked public-health sources and can be incomplete.")
+st.info("For education only. CareGuide cannot diagnose or replace professional medical care. Answers use a small curated library plus relevant MedlinePlus health-topic search results and can be incomplete.")
+st.caption("When a matching search is made, CareGuide sends a short set of topic keywords to MedlinePlus.gov, not your chat history. Avoid names or identifying details.")
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
@@ -259,15 +351,7 @@ for message in st.session_state.messages:
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
         if message.get("sources"):
-            st.markdown("**Sources**")
-            citations = []
-            for source in message["sources"]:
-                citations.extend(source["citations"])
-            seen = set()
-            for title, url in citations:
-                if url not in seen:
-                    seen.add(url)
-                    st.markdown(f"- [{title}]({url})")
+            render_sources(message["sources"])
 
 pending = st.session_state.pop("pending_prompt", None)
 entered = st.chat_input("Ask a general health question…")
@@ -283,19 +367,11 @@ if question:
     with st.chat_message("user"):
         st.markdown(clean_question)
     with st.chat_message("assistant"):
-        with st.spinner("Looking through the health library…"):
+        with st.spinner("Searching the curated library and MedlinePlus…"):
             reply, used_sources = answer_question(clean_question, chat_history)
         st.markdown(reply)
         if used_sources:
-            st.markdown("**Sources**")
-            citations = []
-            for source in used_sources:
-                citations.extend(source["citations"])
-            seen = set()
-            for title, url in citations:
-                if url not in seen:
-                    seen.add(url)
-                    st.markdown(f"- [{title}]({url})")
+            render_sources(used_sources)
     assistant_message = {"role": "assistant", "content": reply}
     if used_sources:
         assistant_message["sources"] = used_sources
