@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: careguide-python
+    runtime: python
+    plan: free
+    buildCommand: echo "No build required"
+    startCommand: python app.py
+    healthCheckPath: /health
+    envVars:
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: OPENAI_MODEL
+        value: gpt-4o-mini
