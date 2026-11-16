@@ -1,56 +1,30 @@
-# CareGuide — Browser AI Medical Chatbot
+# CareGuide — Python AI Medical Chatbot
 
-CareGuide is a static website that runs a small open model directly in each visitor's browser using WebLLM and WebGPU. It does not require an AI API key, a Flask server, or paid AI inference.
+CareGuide is an educational health-information chatbot served by a Python web server. Python serves the complete interface and handles chat requests.
 
-## Live site
+## Hosting
 
-After GitHub Pages is enabled and the deployment workflow succeeds, the site should be available at:
+The repo includes a Render Blueprint at `render.yaml` configured for the free web-service plan. Connect this GitHub repository to Render and create a Blueprint instance. Render's free services may sleep when idle and have resource and usage limits. GitHub Pages cannot run this Python server.
 
-**https://jithendra54.github.io/Ai-Medical-Chatbot/**
+After deploying, add `OPENAI_API_KEY` in the Render service environment. The app uses an OpenAI-compatible chat completions endpoint. Set `OPENAI_MODEL` as needed (default: `gpt-4o-mini`) and optionally `OPENAI_BASE_URL` for a compatible provider. Do not commit API keys or place them in browser code. AI provider usage may cost money; free hosting does not make model inference free.
 
-## How it works
+## Local run
 
-- **AI engine:** WebLLM with the built-in `Llama-3.2-1B-Instruct-q4f16_1-MLC` model.
-- **No API keys:** requests are not sent to Google, Ollama, or a hosted AI provider.
-- **On-device inference:** the model runs in the visitor's browser using WebGPU.
-- **Model caching:** WebLLM caches model artifacts in the browser where supported, to reduce repeat downloads.
-- **Privacy:** chat history remains in page memory and is not sent to a CareGuide server.
-- **Automatic deployment:** pushes to `main` build the Vite site and deploy it with GitHub Pages.
+Requires Python 3.10 or newer. No third-party Python packages are needed for the server.
 
-WebLLM is a third-party open-source project. Read its documentation at https://github.com/mlc-ai/web-llm.
-
-## Requirements and limitations
-
-- A modern browser with working WebGPU is required; Chrome or Edge are reasonable first choices.
-- The first use downloads large model files. This can take time and uses bandwidth/storage on the visitor's device.
-- Performance depends on browser, graphics hardware, available memory and thermal limits. Devices without compatible WebGPU support cannot use this browser-only AI.
-- This is a small general-purpose model, not a medical model. It can make errors and must not be used for diagnosis, emergency triage, or treatment decisions.
-- The site is free to host on GitHub Pages for a public repository, but the visitor's data/bandwidth costs are their own. No AI inference API billing is involved.
-
-## Deploy
-
-1. Open **Settings → Pages** for this repository.
-2. Set **Build and deployment → Source** to **GitHub Actions**.
-3. Open the **Actions** tab and check the workflow named **Build and deploy CareGuide to GitHub Pages**.
-4. Once the workflow finishes successfully, open https://jithendra54.github.io/Ai-Medical-Chatbot/.
-
-The workflow runs on every push to `main`; no secrets are required.
-
-## Local development
-
-Requires Node.js 22+ and npm:
-
-```bash
-npm install
-npm run dev
+```powershell
+$env:OPENAI_API_KEY="your-provider-key"
+python app.py
 ```
 
-Open the local URL shown by Vite. To test WebGPU inference locally, use a browser with WebGPU enabled.
+Open http://localhost:8000. Without an API key, the page loads but chat displays a setup message; the limited emergency keyword response works locally.
 
-## Medical safety
+## Privacy and safety
 
-CareGuide is an informational student project, not a medical device or substitute for a qualified healthcare professional. It cannot reliably diagnose illness or detect every emergency. For potentially life-threatening symptoms, call emergency services; in India call 112. Do not enter identifying or sensitive patient information.
+Chat messages are sent to the configured AI provider. CareGuide does not save chat history; the browser sends recent conversation context with each request. Avoid entering identifying or sensitive patient details. This is an informational student project, not a medical device or substitute for a qualified healthcare professional. It can make errors and cannot reliably diagnose or detect every emergency. For potentially life-threatening symptoms, call emergency services; in India call 112.
 
-## License and attribution
+The emergency phrase check is a limited keyword safeguard, not clinical triage. Do not rely on it to detect emergencies.
 
-WebLLM is distributed under the Apache-2.0 license by its maintainers. See https://github.com/mlc-ai/web-llm/blob/main/LICENSE for its license.
+## Deployment migration
+
+The existing GitHub Pages workflow serves the previous static WebLLM app. A Python server cannot run on GitHub Pages. This branch adds a Render deployment blueprint, but creating a Render account/service and setting an AI provider key are required before the Python app is publicly live.
