@@ -1,10 +1,10 @@
-# CareGuide — Python source-grounded health chatbot
+# CareGuide — Python health information chatbot
 
-CareGuide is an educational health-information chatbot served by a Python web server. The interface is generated and served by Python, and the chat API is handled in Python.
+CareGuide is an educational health-information chatbot. Its interface, source retrieval, and optional chat-provider integration are written in Python with Streamlit.
 
 ## How answers work
 
-The app uses retrieval over a small, curated source library rather than training a model. It currently covers common colds, healthy sleep, and preparing for a doctor visit. Relevant questions receive short source-based guidance and links. Questions outside those topics receive a notice that the source library has no relevant passage.
+The app uses retrieval over a small curated source library rather than training a model. It currently covers common colds, healthy sleep, and preparing for a doctor visit. Relevant questions receive source-based guidance and links. Questions outside those topics receive a message that the source library has no relevant passage.
 
 Sources:
 
@@ -12,30 +12,32 @@ Sources:
 - [MedlinePlus: Healthy Sleep](https://medlineplus.gov/healthysleep.html)
 - [NHS: What to ask your doctor](https://www.nhs.uk/nhs-services/gps/what-to-ask-your-doctor/)
 
-With no AI provider key configured, the app returns the curated passage text and citations directly. If an OpenAI-compatible API key is configured, the app can use it to compose an answer from the retrieved passages, and appends the source URLs. That provider may charge for usage. The knowledge base is small and does not constitute medical training data or a comprehensive medical reference.
+Without an AI provider key, the app returns curated source passages and citations directly. An optional OpenAI-compatible API key can enable model-written answers based on the retrieved passages. That provider may charge for usage. The library is small and is not medical training data or a comprehensive reference.
 
-## Hosting
+## Deploy on Render
 
-The repo includes a Render Blueprint at `render.yaml` for its free web-service plan. Connect the GitHub repo to Render and create a Blueprint instance. Free services can sleep when idle and have resource and usage limits. GitHub Pages cannot run a Python server.
+The repository includes a Render Blueprint at `render.yaml`. Connect the GitHub repository to Render and create a Blueprint instance. Select the `main` branch and the free web-service plan. Free services have usage limits and can sleep when idle; GitHub Pages cannot run this Python app.
 
-AI inference is optional for the cited source lookup. To enable model-written responses, set `OPENAI_API_KEY` in the hosting service environment. Set `OPENAI_MODEL` as needed (default: `gpt-4o-mini`) and optionally `OPENAI_BASE_URL` for a compatible provider. Do not commit API keys or put them in browser code. A free hosting plan does not make model inference free.
+To enable optional model-written responses, add `OPENAI_API_KEY` in the Render service's environment settings. Do not commit keys to GitHub or put them in browser code. The source-library responses work without this key.
 
-## Local run
+## Run locally
 
-Requires Python 3.10 or newer. The web server uses only Python's standard library.
+Requires Python 3.10 or newer.
 
-```powershell
-python app.py
+```bash
+python -m venv .venv
+# Windows PowerShell:
+.venv\\Scripts\\Activate.ps1
+# macOS/Linux:
+# source .venv/bin/activate
+pip install -r requirements.txt
+streamlit run app.py
 ```
 
-Open http://localhost:8000. The `/health` endpoint is used by the host. No AI key is required for source-library answers.
+Open the local URL printed by Streamlit. No AI key is needed for curated source answers.
 
 ## Privacy and safety
 
-CareGuide does not save chat history. The browser sends recent conversation context with each request. If configured, chat messages are sent to the selected AI provider. Avoid entering identifying or sensitive patient details.
+CareGuide does not save chat history between sessions. If configured, chat messages and recent context are sent to the selected AI provider. Avoid entering identifying or sensitive patient information.
 
 This is an informational student project, not a medical device or substitute for a qualified healthcare professional. It can make errors and cannot reliably diagnose or detect every emergency. For potentially life-threatening symptoms, call emergency services; in India call 112. Emergency phrase matching is a limited safeguard, not clinical triage.
-
-## Deployment migration
-
-The former Vite/WebLLM frontend and GitHub Pages deployment workflow have been removed from this branch. A Python server cannot run on GitHub Pages. A Render account/service is still needed before the Python app is live.
