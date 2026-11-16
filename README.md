@@ -1,56 +1,43 @@
-# CareGuide — Browser AI Medical Chatbot
+# CareGuide — Python health information chatbot
 
-CareGuide is a static website that runs a small open model directly in each visitor's browser using WebLLM and WebGPU. It does not require an AI API key, a Flask server, or paid AI inference.
+CareGuide is an educational health-information chatbot. Its interface, source retrieval, and optional chat-provider integration are written in Python with Streamlit.
 
-## Live site
+## How answers work
 
-After GitHub Pages is enabled and the deployment workflow succeeds, the site should be available at:
+The app uses retrieval over a small curated source library rather than training a model. It currently covers common colds, healthy sleep, and preparing for a doctor visit. Relevant questions receive source-based guidance and links. Questions outside those topics receive a message that the source library has no relevant passage.
 
-**https://jithendra54.github.io/Ai-Medical-Chatbot/**
+Sources:
 
-## How it works
+- [MedlinePlus: Common Cold](https://medlineplus.gov/commoncold.html)
+- [MedlinePlus: Healthy Sleep](https://medlineplus.gov/healthysleep.html)
+- [NHS: What to ask your doctor](https://www.nhs.uk/nhs-services/gps/what-to-ask-your-doctor/)
 
-- **AI engine:** WebLLM with the built-in `Llama-3.2-1B-Instruct-q4f16_1-MLC` model.
-- **No API keys:** requests are not sent to Google, Ollama, or a hosted AI provider.
-- **On-device inference:** the model runs in the visitor's browser using WebGPU.
-- **Model caching:** WebLLM caches model artifacts in the browser where supported, to reduce repeat downloads.
-- **Privacy:** chat history remains in page memory and is not sent to a CareGuide server.
-- **Automatic deployment:** pushes to `main` build the Vite site and deploy it with GitHub Pages.
+Without an AI provider key, the app returns curated source passages and citations directly. An optional OpenAI-compatible API key can enable model-written answers based on the retrieved passages. That provider may charge for usage. The library is small and is not medical training data or a comprehensive reference.
 
-WebLLM is a third-party open-source project. Read its documentation at https://github.com/mlc-ai/web-llm.
+## Deploy on Render
 
-## Requirements and limitations
+The repository includes a Render Blueprint at `render.yaml`. Connect the GitHub repository to Render and create a Blueprint instance. Select the `main` branch and the free web-service plan. Free services have usage limits and can sleep when idle; GitHub Pages cannot run this Python app.
 
-- A modern browser with working WebGPU is required; Chrome or Edge are reasonable first choices.
-- The first use downloads large model files. This can take time and uses bandwidth/storage on the visitor's device.
-- Performance depends on browser, graphics hardware, available memory and thermal limits. Devices without compatible WebGPU support cannot use this browser-only AI.
-- This is a small general-purpose model, not a medical model. It can make errors and must not be used for diagnosis, emergency triage, or treatment decisions.
-- The site is free to host on GitHub Pages for a public repository, but the visitor's data/bandwidth costs are their own. No AI inference API billing is involved.
+To enable optional model-written responses, add `OPENAI_API_KEY` in the Render service's environment settings. Do not commit keys to GitHub or put them in browser code. The source-library responses work without this key.
 
-## Deploy
+## Run locally
 
-1. Open **Settings → Pages** for this repository.
-2. Set **Build and deployment → Source** to **GitHub Actions**.
-3. Open the **Actions** tab and check the workflow named **Build and deploy CareGuide to GitHub Pages**.
-4. Once the workflow finishes successfully, open https://jithendra54.github.io/Ai-Medical-Chatbot/.
-
-The workflow runs on every push to `main`; no secrets are required.
-
-## Local development
-
-Requires Node.js 22+ and npm:
+Requires Python 3.10 or newer.
 
 ```bash
-npm install
-npm run dev
+python -m venv .venv
+# Windows PowerShell:
+.venv\\Scripts\\Activate.ps1
+# macOS/Linux:
+# source .venv/bin/activate
+pip install -r requirements.txt
+streamlit run app.py
 ```
 
-Open the local URL shown by Vite. To test WebGPU inference locally, use a browser with WebGPU enabled.
+Open the local URL printed by Streamlit. No AI key is needed for curated source answers.
 
-## Medical safety
+## Privacy and safety
 
-CareGuide is an informational student project, not a medical device or substitute for a qualified healthcare professional. It cannot reliably diagnose illness or detect every emergency. For potentially life-threatening symptoms, call emergency services; in India call 112. Do not enter identifying or sensitive patient information.
+CareGuide does not save chat history between sessions. If configured, chat messages and recent context are sent to the selected AI provider. Avoid entering identifying or sensitive patient information.
 
-## License and attribution
-
-WebLLM is distributed under the Apache-2.0 license by its maintainers. See https://github.com/mlc-ai/web-llm/blob/main/LICENSE for its license.
+This is an informational student project, not a medical device or substitute for a qualified healthcare professional. It can make errors and cannot reliably diagnose or detect every emergency. For potentially life-threatening symptoms, call emergency services; in India call 112. Emergency phrase matching is a limited safeguard, not clinical triage.
