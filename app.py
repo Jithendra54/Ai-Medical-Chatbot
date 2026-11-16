@@ -24,6 +24,49 @@ EMERGENCY_PATTERNS = [
     r"\\b(unconscious|not waking up|severe bleeding|throat closing|overdose|active seizure)\\b",
     r"\\b(kill myself|suicidal intent|going to harm myself)\\b",
 ]
+HEALTH_SOURCES = [
+    {
+        "title": "Common cold",
+        "url": "https://medlineplus.gov/commoncold.html",
+        "keywords": {"cold", "cough", "sore", "throat", "runny", "nose", "congestion", "sneeze", "fever", "fluids", "rest"},
+        "text": "Common colds are usually mild and often improve in 7 to 10 days, though some symptoms can last 10 to 14 days. Rest, drink fluids, use saline nose drops or spray, and consider a clean humidifier. Antibiotics do not treat viral colds. Seek medical advice for trouble breathing, dehydration, fever lasting more than 4 days, symptoms lasting more than 10 days without improvement, or symptoms that improve and then worsen."
+    },
+    {
+        "title": "Healthy sleep",
+        "url": "https://medlineplus.gov/healthysleep.html",
+        "keywords": {"sleep", "insomnia", "tired", "bedtime", "wake", "caffeine", "routine", "rest"},
+        "text": "Helpful sleep habits include keeping a regular bedtime and wake time, avoiding caffeine later in the day, exercising regularly but not close to bedtime, keeping the bedroom cool, dark, and quiet, and allowing enough time for sleep. Adults generally need 7 to 9 hours, though needs vary. Speak with a health professional if sleep trouble continues."
+    },
+    {
+        "title": "Preparing for a doctor visit",
+        "url": "https://www.nhs.uk/nhs-services/gps/what-to-ask-your-doctor/",
+        "keywords": {"doctor", "appointment", "visit", "symptom", "symptoms", "questions", "clinician", "medicine", "medicines"},
+        "text": "Before an appointment, write down your main questions and describe symptoms, when they started, and what makes them better or worse. Bring a list of medicines and supplements. Ask what tests are for, how and when results arrive, what the next steps are, and who to contact if symptoms worsen. Ask the clinician to explain anything unclear."
+    },
+]
+
+OUT_OF_SCOPE_REPLY = ("I couldn't find a relevant passage in CareGuide's small source library for that question. "
+                      "Please check with a qualified healthcare professional or consult a trusted health source. "
+                      "This chatbot is limited to a few general topics and cannot assess personal symptoms.")
+
+def retrieve_sources(question):
+    words = set(re.findall(r"[a-z]+", question.lower()))
+    scored = []
+    for source in HEALTH_SOURCES:
+        score = len(words & source["keywords"])
+        if score:
+            scored.append((score, source))
+    return [source for _, source in sorted(scored, key=lambda item: item[0], reverse=True)[:2]]
+
+def grounded_answer(question, sources):
+    if not sources:
+        return OUT_OF_SCOPE_REPLY
+    if not os.environ.get("OPENAI_API_KEY"):
+        excerpts = "\\n\\n".join(source["text"] for source in sources)
+        citations = "\\n".join("Source: " + source["title"] + " — " + source["url"] for source in sources)
+        return excerpts + "\\n\\n" + citations + "\\n\\nGeneral information only; this is not a diagnosis."
+    return None
+
 EMERGENCY_REPLY = ("Please seek urgent medical help now. Do not wait for an AI response. "
                    "If you are in India, call 112; otherwise call your local emergency number. "
                    "Ask someone nearby to help. This automated warning is limited and is not a medical assessment.")
@@ -138,12 +181,22 @@ class Handler(BaseHTTPRequestHandler):
             if any(re.search(pattern, message, re.I) for pattern in EMERGENCY_PATTERNS):
                 self._send(200, json.dumps({"reply": EMERGENCY_REPLY}))
                 return
+            sources = retrieve_sources(message)
+            grounded = grounded_answer(message, sources)
+            if grounded is not None:
+                self._send(200, json.dumps({"reply": grounded}))
+                return
             api_key = os.environ.get("OPENAI_API_KEY")
             if not api_key:
-                self._send(503, json.dumps({"error": "AI provider is not configured yet. Set OPENAI_API_KEY in the hosting service environment."}))
+                self._send(200, json.dumps({"reply": OUT_OF_SCOPE_REPLY}))
                 return
             raw_history = payload.get("history", [])
-            messages = [{"role": "system", "content": SYSTEM_PROMPT}]
+            source_context = "\\n".join(
+                source["title"] + " (" + source["url"] + "): " + source["text"]
+                for source in sources
+            )
+            grounded_system_prompt = SYSTEM_PROMPT + "\\nAnswer only from the following retrieved source passages. If they do not support an answer, say so. Include the source title and URL in your response. Do not infer a diagnosis.\\n" + source_context
+            messages = [{"role": "system", "content": grounded_system_prompt}]
             if isinstance(raw_history, list):
                 for item in raw_history[-8:]:
                     if isinstance(item, dict) and item.get("role") in ("user", "assistant") and isinstance(item.get("content"), str):
@@ -154,7 +207,7 @@ class Handler(BaseHTTPRequestHandler):
             with urlopen(req, timeout=45) as response:
                 result = json.loads(response.read(1000000))
             reply = result["choices"][0]["message"]["content"]
-            self._send(200, json.dumps({"reply": reply}))
+            citations = "\\n\\nSources: " + ", ".join(source["title"] + " (" + source["url"] + ")" for source in sources)\n            self._send(200, json.dumps({"reply": reply + citations}))
         except HTTPError as exc:
             self._send(502, json.dumps({"error": "The AI provider returned an error. Check its API key, model access, and usage limits."}))
         except (URLError, TimeoutError):
