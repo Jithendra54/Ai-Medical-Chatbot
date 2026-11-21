@@ -30,6 +30,9 @@ The repository includes a Render Blueprint at `render.yaml`. Connect the GitHub 
 
 To enable optional model-written answers, add `OPENAI_API_KEY` in the Render service's environment settings. Never commit keys to GitHub or put them in browser code. Live source lookup works without an AI key.
 
+## Medical Chatbot Website  
+Link: [https://ai-medical-chatbot-1-q8aw.onrender.com/](https://ai-medical-chatbot-1-q8aw.onrender.com/)
+
 ## Run locally
 
 Requires Python 3.10 or newer.
